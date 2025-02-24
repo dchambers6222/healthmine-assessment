@@ -1,0 +1,24 @@
+# AWS CloudFormation
+*.json
+!package.json
+.aws-sam/
+
+# Environment variables
+.env
+*.env
+.env.*
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/

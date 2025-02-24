@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Healthmine docker webapp assessment infrastructure
+
+
+
+Parameters: 
+  ProjectNamePrefix:
+    Type: String
+    Default: healthmine
+    Description: Prefix for the project name (EG. healthmine, comp-name)
+
+  EnvironmentType:
+    Type: String
+    Default: assessment
+    Description: Type of environment for resource deployment (e.g., assessment, dev, prod, stage)
+    AllowedValues:
+      - assessment
+      - dev
+      - stage
+      - prod
+
+  CertificateARN:
+    Type: String
+    Description: ARN of the SSL certificate for the application load balancer
+
+  AMIID:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+    Description: ID of the Amazon Machine Image for the EC2 instances
+
+  DockerImage:
+    Type: String
+    Default: nginx:latest
+    Description: Docker image to run on EC2 instances
+  
+  DbUsername:
+    Type: String
+    NoEcho: true
+    Default: admin
+    Description: Username for the database
+  
+  DBPassword:
+    Type: String
+    Description: Password for RDS instance
+    NoEcho: true
+    MinLength: 8
+    ConstraintDescription: Must be at least 8 characters long
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: EC2 instance type
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t3.micro
+      - t3.small
+
+  UserDataScriptPath:
+    Type: String
+    Default: s3://healthmine-docker-assessment-bucket/user-data.sh
+    Description: S3 path to the user data script for the EC2 instances
+
+  VpcCIDR:
+    Description: CIDR block for the VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+
+
+
+Conditions:
+  HasCertificate: !Not [!Equals [!Ref CertificateARN, ""]]
+
+
+
+
+Resources: 
+  # VPC
+  ApplicationVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: 
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-vpc
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+
+#Network Configuration
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags: 
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-ig
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      VpcId: !Ref ApplicationVPC
+      InternetGatewayId: !Ref InternetGateway
+  
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      VpcId: !Ref ApplicationVPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-public-subnet-1
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      VpcId: !Ref ApplicationVPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-public-subnet-2
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref ApplicationVPC
+      Tags: 
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-public-routes
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+  DefaultPublicRoutes:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+    
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+
+Outputs:
+  VpcId:
+    Value: !Ref ApplicationVPC
+    Description: VPC ID
