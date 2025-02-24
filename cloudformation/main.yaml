@@ -162,6 +162,75 @@ Resources:
       SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
 
+      
+  # Security Group
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security group for the application load balancer
+      VpcId: !Ref ApplicationVPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-alb-sg
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security group for the EC2 instances
+      VpcId: !Ref ApplicationVPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          SourceSecurityGroup: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-ec2-sg
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security group for the RDS DB
+      VpcId: !Ref ApplicationVPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: '3306'
+          ToPort: '3306'
+          SourceSecurityGrpId: !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-rds-sg
+        - Key: Environment
+          Value: !Ref EnvironmentType
+      
+    
 
 Outputs:
   VpcId:
