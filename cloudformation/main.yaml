@@ -19,6 +19,11 @@ Parameters:
       - stage
       - prod
 
+  HTTPHealthPort:
+    Type: Number
+    Default: 8080
+    Description: Port for health checks on the app LB, and EC2 instances
+
   CertificateARN:
     Type: String
     Description: ARN of the SSL certificate for the application load balancer
@@ -33,7 +38,7 @@ Parameters:
     Default: nginx:latest
     Description: Docker image to run on EC2 instances
   
-  DbUsername:
+  DBUsername:
     Type: String
     NoEcho: true
     Default: admin
@@ -43,7 +48,7 @@ Parameters:
     Type: String
     Description: Password for RDS instance
     NoEcho: true
-    MinLength: 8
+    MinLength: '8'
     ConstraintDescription: Must be at least 8 characters long
 
   InstanceType:
@@ -56,17 +61,19 @@ Parameters:
       - t3.micro
       - t3.small
 
-  UserDataScriptPath:
+  ProjectDependenciesBucket:
     Type: String
-    Default: s3://healthmine-docker-assessment-bucket/user-data.sh
-    Description: S3 path to the user data script for the EC2 instances
-
-  VpcCIDR:
-    Description: CIDR block for the VPC
-    Type: String
-    Default: 10.0.0.0/16
+    Default: healthmine-docker-assessment-bucket
+    Description: S3 Bucket where user-data.sh and any other depencies are stored
 
 
+
+Mappings:
+  NetworkConfiguration:
+    CIDRBlocks:
+      VPC: '10.0.0.0/16'
+      PublicSubnet1CIDR: '10.0.1.0/24'
+      PublicSubnet2CIDR: '10.0.2.0/24'
 
 
 Conditions:
@@ -76,11 +83,11 @@ Conditions:
 
 
 Resources: 
-  # VPC
+# VPC
   ApplicationVPC:
     Type: AWS::EC2::VPC
     Properties: 
-      CidrBlock: !Ref VpcCIDR
+      CidrBlock: !FindInMap [NetworkConfiguration, CIDRBlocks, VPC]
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags: 
@@ -88,6 +95,8 @@ Resources:
           Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-vpc
         - Key: Environment
           Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
 
 
 #Network Configuration
@@ -99,6 +108,8 @@ Resources:
           Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-ig
         - Key: Environment
           Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
 
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -111,26 +122,30 @@ Resources:
     Properties: 
       VpcId: !Ref ApplicationVPC
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: 10.0.1.0/24
+      CidrBlock: !FindInMap [NetworkConfiguration, CIDRBlocks, PublicSubnet1CIDR]
       MapPublicIpOnLaunch: true
       Tags: 
         - Key: Name
           Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-public-subnet-1
         - Key: Environment
           Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties: 
       VpcId: !Ref ApplicationVPC
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !FindInMap [NetworkConfiguration, CIDRBlocks, PublicSubnet2CIDR]
       MapPublicIpOnLaunch: true
       Tags: 
         - Key: Name
           Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-public-subnet-2
         - Key: Environment
           Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -141,6 +156,8 @@ Resources:
           Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-public-routes
         - Key: Environment
           Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
 
   DefaultPublicRoutes:
     Type: AWS::EC2::Route
@@ -163,7 +180,485 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
 
 
+# Security Groups
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security group for the application load balancer
+      VpcId: !Ref ApplicationVPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: !Ref HTTPHealthPort
+          ToPort: !Ref HTTPHealthPort
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-alb-sg
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security group for the EC2 instances
+      VpcId: !Ref ApplicationVPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: !Ref HTTPHealthPort
+          ToPort: !Ref HTTPHealthPort
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-ec2-sg
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security group for the RDS DB
+      VpcId: !Ref ApplicationVPC
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-rds-sg
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+
+# S3 Bucket for App Files
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Sub ${ProjectNamePrefix}-${EnvironmentType}-app-files-${AWS::AccountId}-${AWS::Region}
+      VersioningConfiguration: 
+        Status: Enabled
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+          - ServerSideEncryptionByDefault: 
+              SSEAlgorithm: AES256
+      LifecycleConfiguration: 
+        Rules: 
+          - Id: transition-to-standard-ia
+            Status: Enabled
+            Transitions: 
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 90
+            ExpirationInDays: 365
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      Tags: 
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-app-files
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties: 
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: 
+              AWS:  !GetAtt EC2InstanceRole.Arn
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:aws:s3:::${S3Bucket}/*
+              - !Sub arn:aws:s3:::${S3Bucket}
+
+  
+# Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: application
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-alb
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+    #ALB Target Group
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref ApplicationVPC
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /index.html
+      HealthCheckPort: !Ref HTTPHealthPort
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-alb-tg
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+    #ALB Listeners
+  ALBHTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  ALBHealthListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: !Ref HTTPHealthPort
+      Protocol: HTTP
+  
+  ALBHTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificate
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref CertificateARN
+      SslPolicy: ELBSecurityPolicy-2016-08
+
+
+# DB Configuration
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub ${ProjectNamePrefix}-${EnvironmentType} DB Subnet Group
+      SubnetIds:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-rds-subnet-group
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+  
+  DBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: !Sub ${ProjectNamePrefix}-${EnvironmentType} DB Parameter Group
+      Family: mysql8.0
+      Parameters:
+        character_set_server: utf8mb4
+        collation_server: utf8mb4_general_ci
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-rds-parameter-group
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t3.micro
+      DBName: applicationdb
+      Engine: mysql
+      EngineVersion: '8.0'
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroup
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: 03:00-04:00
+      PreferredMaintenanceWindow: Mon:04:00-Mon:05:00
+      DBParameterGroupName: !Ref DBParameterGroup
+      MultiAZ: true
+      StorageType: gp2
+      PubliclyAccessible: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-db
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+    DeletionPolicy: Snapshot
+
+
+
+# CloudWatch log group
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /${ProjectNamePrefix}/${EnvironmentType}/app-logs
+      RetentionInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-app-logs
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+
+
+# IAM Roles
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-ec2-role
+        - Key: Environment
+          Value: !Ref EnvironmentType
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+
+  S3AccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectNamePrefix}-${EnvironmentType}-s3-access
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:aws:s3:::${S3Bucket}/*
+              - !Sub arn:aws:s3:::${S3Bucket}
+      Roles:
+        - !Ref EC2InstanceRole
+  
+  #giving access to S3 bucket storing User-Data script
+  ExternalS3AccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+        PolicyName: !Sub ${ProjectNamePrefix}-${EnvironmentType}-external-s3-access
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:ListBucket
+              Resource: 
+              - !Sub arn:aws:s3:::${ProjectDependenciesBucket}/user-data.sh
+              - !Sub arn:aws:s3:::${ProjectDependenciesBucket}/test-connectivity.py
+              - !Sub arn:aws:s3:::${ProjectDependenciesBucket}
+        Roles:
+          - !Ref EC2InstanceRole
+
+  CloudWatchAccessPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectNamePrefix}-${EnvironmentType}-cloudwatch-access
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+              - cloudwatch:GetMetricStatistics
+              - cloudwatch:ListMetrics
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:CreateLogGroup
+              - logs:PutLogEvents
+              - logs:DescribeLogStreams
+            Resource: arn:aws:logs:*:*:*
+      Roles:
+        - !Ref EC2InstanceRole
+
+
+# EC2 Instance Configuration
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2InstanceRole
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref AMIID
+        InstanceType: !Ref InstanceType
+        SecurityGroupIds:
+          - !Ref EC2SecurityGroup
+        IamInstanceProfile:
+          Arn: !GetAtt EC2InstanceProfile.Arn
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            aws s3 cp s3://${ProjectDependenciesBucket}/user-data.sh /tmp/user-data.sh
+            chmod +x /tmp/user-data.sh
+            /tmp/user-data.sh
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-instance
+              - Key: Environment
+                Value: !Ref EnvironmentType
+              - Key: Project
+                Value: !Ref ProjectNamePrefix
+
+
+# Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${ProjectNamePrefix}-${EnvironmentType}-asg
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      DefaultInstanceWarmup: 0
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MaxSize: '3'
+      MinSize: '1'
+      DesiredCapacity: '1'
+      TargetGroupARNs:
+        - !Ref ALBTargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-instance
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref EnvironmentType
+          PropagateAtLaunch: true
+        - Key: Project
+          Value: !Ref ProjectNamePrefix
+          PropagateAtLaunch: true
+
+  ScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: SimpleScaling
+      AdjustmentType: ChangeInCapacity
+      ScalingAdjustment: 1
+      Cooldown: '300'
+
+  ScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: SimpleScaling
+      AdjustmentType: ChangeInCapacity
+      ScalingAdjustment: -1
+      Cooldown: '300'
+
+
+
+
+
+
 Outputs:
   VpcId:
     Value: !Ref ApplicationVPC
     Description: VPC ID
+
+  LoadBalancerDNSName:
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Description: DNS name of the application load balancer
+
+  RDSEndpoint:
+    Value: !GetAtt RDSInstance.Endpoint.Address
+    Description: Endpoint address of the RDS instance
+  
+  S3BucketName:
+    Value: !Ref S3Bucket
+    Description: Name of the S3 bucket for application files
+  
+  CloudWatchLogGroup:
+    Value: !Ref AppLogGroup
+    Description: CloudWatch log group for application logs
