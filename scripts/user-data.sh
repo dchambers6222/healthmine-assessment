@@ -1,54 +1,39 @@
 #!/bin/bash
-
-# Set up logging
+# Set up standard logging
 exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
-# Update and install packages
+# Update then install Docker
 yum update -y
-yum install -y docker git aws-cli
-
-# Set up Docker
+yum install -y docker aws-cli jq
 systemctl start docker
 systemctl enable docker
 
-# Install Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+# Get configuration info from the cloud formation stack
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+STACK_NAME=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=aws:cloudformation:stack-name" --query "Tags[0].Value" --output text --region $REGION)
 
-# Add ec2-user to docker group
-usermod -a -G docker ec2-user
+RDS_ENDPOINT=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='RDSEndpoint'].OutputValue" --output text --region $REGION)
+S3_BUCKET=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" --output text --region $REGION)
 
-# Set up application
-mkdir -p /app
-cd /app
+# Create health check file
+mkdir -p /health
+echo "OK" > /health/index.html
 
-# Create Docker Compose configuration
-cat > docker-compose.yml <<'COMPOSE'
-version: '3.8'
-services:
-  web:
-    image: drupal:latest
-    ports:
-      - "80:80"
-    environment:
-      - MYSQL_HOST=${RDS_ENDPOINT}
-      - MYSQL_USER=${DB_USER}
-      - MYSQL_PASSWORD=${DB_PASSWORD}
-      - MYSQL_DATABASE=${DB_NAME}
-      - S3_BUCKET=${S3_BUCKET_NAME}
-    volumes:
-      - drupal_data:/var/www/html
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+# Run the simple web container
+docker run -d --name simple-web -p 80:80 \
+  -e RDS_ENDPOINT="$RDS_ENDPOINT" \
+  -e S3_BUCKET="$S3_BUCKET" \
+  yeasy/simple-web:latest
 
-volumes:
-  drupal_data:
-COMPOSE
+# Run separate container for health check
+docker run -d --name health-check -p 8080:80 -v /health:/usr/share/nginx/html:ro nginx:alpine
 
-# Pull and start the application
-docker pull drupal:latest
-docker-compose up -d
+
+# Install dependencies for the test-connectivity script
+yum install -y python3 python3-pip
+pip3 install boto3 mysql-connector-python
+
+# Copy the test-connectivity script from seperate S3 bucket
+aws s3 cp s3://${ProjectDependenciesBucket}/test-connectivity.py /usr/local/bin/
+chmod +x /usr/local/bin/test-connectivity.py

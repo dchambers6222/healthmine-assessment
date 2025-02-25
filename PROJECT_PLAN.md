@@ -3,7 +3,7 @@
 ## Project Phases & Tasks
 
 ### 1. Initial Setup (Day 1)
-- [ ] Create repository structure
+- [x] Create repository structure
 - [ ] Set up basic documentation
 - [ ] Create architecture diagram
   - EC2, RDS, S3 components
@@ -12,14 +12,14 @@
 - [ ] List required AWS resources and their dependencies
 
 ### 2. Infrastructure Template (Days 2-3)
-- [ ] Create base CloudFormation template
-- [ ] Add core resources:
-  - [ ] VPC and networking
-  - [ ] EC2 instance
-  - [ ] RDS database
-  - [ ] S3 bucket
-  - [ ] Security groups
-- [ ] Test template deployment
+- [x] Create base CloudFormation template
+- [x] Add core resources:
+  - [x] VPC and networking
+  - [x] EC2 instance
+  - [x] RDS database
+  - [x] S3 bucket
+  - [x] Security groups
+- [x] Test template deployment
 
 ### 3. Security & IAM (Day 3)
 - [ ] Configure IAM roles and policies
