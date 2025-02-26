@@ -83,6 +83,7 @@ git clone https://github.com/dchambers6222/healthmine-assessment.git
 Make sure the files are uploaded with exactly these names to your bucket's root.
 
 <br> 
+
 ### 2. Parameter Preparation
 
 Prepare the parameters required for deployment. The repository includes parameter files for both JSON and YAML formats:
