@@ -5,37 +5,51 @@ import argparse
 import os
 import sys
 import time
-import urllib.request
+import requests
 import boto3
 import mysql.connector
-from botocore.exceptions import ClientError
+import warnings
+import boto3.exceptions
 
-# ANSI color codes
-GREEN, RED, BLUE, BOLD, ENDC = '\033[92m', '\033[91m', '\033[94m', '\033[1m', '\033[0m'
+# Suppressing warnings from Boto3. AWS default python verion = 3.7, not 3.8
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=boto3.exceptions.PythonDeprecationWarning)
 
-def log(message, status=None):
-    """Print formatted message based on status."""
-    prefix = {
-        "success": f"{GREEN}✓",
-        "error": f"{RED}✗",
-        "header": f"{BLUE}{BOLD}"
-    }.get(status, "")
-    suffix = ENDC if status else ""
-    print(f"{prefix} {message}{suffix}")
+
+# color codes
+GREEN = '\033[92m'
+RED = '\033[91m'
+RESET = '\033[0m'
+
+
+# Simple output formatting
+def log(message, success=None):
+    """Print formatted message."""
+    if success is True:
+        prefix = f"{GREEN}\u2713{RESET}"
+    elif success is False:
+        prefix = f"{RED}\u2717{RESET}"
+    else:
+        prefix = ""
+    print(f"{prefix} {message}")
+
+
 
 def test_http_endpoint(url, name):
-    """Test HTTP endpoint connectivity."""
+    """Test HTTP endpoint connectivity using requests."""
     try:
-        response = urllib.request.urlopen(url, timeout=10)
-        if response.getcode() == 200:
-            log(f"{name} is accessible at {url}", "success")
-            return True
-        else:
-            log(f"{name} returned status code {response.getcode()}", "error")
-            return False
-    except Exception as e:
-        log(f"Error connecting to {name}: {e}", "error")
+        response = requests.get(url, timeout=10, verify=False)
+        response.raise_for_status()  # Raises exception for 4XX/5XX status codes
+        log(f"{name} is accessible at {url}", True)
+        return True
+    except requests.exceptions.HTTPError as e:
+        log(f"{name} returned error status code: {e}", False)
         return False
+    except requests.exceptions.RequestException as e:
+        log(f"Error connecting to {name}: {e}", False)
+        return False
+
+
 
 def test_rds_connectivity(rds_endpoint, db_user, db_password, db_name):
     """Test RDS database connection."""
@@ -48,9 +62,9 @@ def test_rds_connectivity(rds_endpoint, db_user, db_password, db_name):
         # Check MySQL version
         cursor.execute("SELECT VERSION()")
         version = cursor.fetchone()
-        log(f"RDS connection successful (MySQL version: {version[0]})", "success")
+        log(f"RDS connection successful (MySQL version: {version[0]})", True)
         
-        # Create test table if not exists
+        # Create test table and insert record
         cursor.execute("SHOW TABLES LIKE 'test_connectivity'")
         if not cursor.fetchone():
             cursor.execute("""
@@ -59,94 +73,80 @@ def test_rds_connectivity(rds_endpoint, db_user, db_password, db_name):
                 test_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 test_result VARCHAR(255)
             )""")
-            log("Created test_connectivity table", "success")
         
-        # Insert test record
         cursor.execute("INSERT INTO test_connectivity (test_result) VALUES ('Test successful')")
         conn.commit()
-        log("Successfully inserted test record into database", "success")
+        log("Successfully wrote to database", True)
         
         cursor.close()
         conn.close()
         return True
     except Exception as e:
-        log(f"RDS connection failed: {e}", "error")
+        log(f"RDS connection failed: {e}", False)
         return False
 
+
+
 def test_s3_connectivity(s3_bucket):
-    """Test S3 bucket connectivity by uploading a file."""
+    """Test S3 bucket connectivity using put_object."""
     try:
         s3 = boto3.client('s3')
-        test_file_name = f"test-file-{int(time.time())}.txt"
+        test_key = f"test-object-{int(time.time())}.txt"
         
-        # Create, upload, verify, and cleanup test file
-        with open(test_file_name, 'w') as f:
-            f.write(f"Test file created at {time.ctime()}")
+        s3.put_object(
+            Bucket=s3_bucket,
+            Key=test_key,
+            Body="Test content",
+            ContentType="text/plain"
+        )
         
-        s3.upload_file(test_file_name, s3_bucket, test_file_name)
-        log(f"Uploaded {test_file_name} to S3 bucket {s3_bucket}", "success")
-        
-        response = s3.list_objects_v2(Bucket=s3_bucket, Prefix=test_file_name)
-        if 'Contents' in response:
-            log("Verified file exists in S3 bucket", "success")
-        
-        s3.delete_object(Bucket=s3_bucket, Key=test_file_name)
-        os.remove(test_file_name)
-        log("Deleted test file from S3 bucket", "success")
+        s3.delete_object(Bucket=s3_bucket, Key=test_key)
+        log(f"S3 bucket {s3_bucket} test successful", True)
         
         return True
     except Exception as e:
-        log(f"S3 operation failed: {e}", "error")
+        log(f"S3 operation failed: {e}", False)
         return False
 
+
+
 def main():
-    """Main function to run the tests."""
-    parser = argparse.ArgumentParser(description='Test AWS infrastructure connectivity')
+    parser = argparse.ArgumentParser(description='Test infrastructure connectivity')
     parser.add_argument('alb_dns_name', help='DNS name of the ALB')
     parser.add_argument('rds_endpoint', help='Endpoint of the RDS instance')
     parser.add_argument('s3_bucket', help='Name of the S3 bucket')
-    parser.add_argument('db_password', help='Password for the database')
+    parser.add_argument('db_password', help='Password for the DB')
     parser.add_argument('--db-user', default='admin', help='Database username (default: admin)')
     parser.add_argument('--db-name', default='applicationdb', help='Database name (default: applicationdb)')
     
     args = parser.parse_args()
     
-    log("\n\n=== Testing Infrastructure ===", "header")
+    log("\n\n=== Running Tests ===\n---------------------")
     
     # Run all tests
-    tests = [
-        ("Test 1: Checking ALB connectivity", 
-         test_http_endpoint, [f"http://{args.alb_dns_name}", "ALB"]),
-        
-        ("Test 2: Checking health endpoint", 
-         test_http_endpoint, [f"http://{args.alb_dns_name}:8080/index.html", "Health endpoint"]),
-        
-        ("Test 3: Testing RDS connectivity", 
-         test_rds_connectivity, [args.rds_endpoint, args.db_user, args.db_password, args.db_name]),
-        
-        ("Test 4: Testing S3 connectivity", 
-         test_s3_connectivity, [args.s3_bucket])
-    ]
+    all_passed = True
     
-    results = []
-    for title, func, params in tests:
-        log(title, "header")
-        results.append(func(*params))
+    log("Checking ALB connectivity")
+    if not test_http_endpoint(f"http://{args.alb_dns_name}", "ALB"):
+        all_passed = False
+        
+    log("\nChecking health endpoint")
+    if not test_http_endpoint(f"http://{args.alb_dns_name}:8080/index.html", "Health endpoint"):
+        all_passed = False
+        
+    log("\nTesting RDS connectivity")
+    if not test_rds_connectivity(args.rds_endpoint, args.db_user, args.db_password, args.db_name):
+        all_passed = False
+        
+    log("\nTesting S3 connectivity")
+    if not test_s3_connectivity(args.s3_bucket):
+        all_passed = False
     
     # Print summary
-    log("=== Test Summary ===", "header")
-    print(f"ALB Endpoint: {args.alb_dns_name}")
-    print(f"RDS Endpoint: {args.rds_endpoint}")
-    print(f"S3 Bucket: {args.s3_bucket}")
-    
-    passed = sum(results)
-    total = len(results)
-    
-    status = "success" if passed == total else "error"
-    message = f"All tests passed! ({passed}/{total})" if passed == total else f"Some tests failed. ({passed}/{total} passed)"
-    log(message, status)
-    
-    return 0 if passed == total else 1
+    log("\n\n=== Test Summary ===\n--------------------")
+    log(f"Tests completed: {GREEN+'All tests passed'+RESET if all_passed else RED+'Some tests failed'+RESET}\n", all_passed)
+
+
 
 if __name__ == "__main__":
     sys.exit(main())

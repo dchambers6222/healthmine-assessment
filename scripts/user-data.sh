@@ -33,6 +33,7 @@ docker run -d --name health-check -p 8080:80 -v /health:/usr/share/nginx/html:ro
 # Install dependencies for the test-connectivity script
 yum install -y python3 python3-pip
 pip3 install boto3 mysql-connector-python
+pip3 install requests
 
 # Copy the test-connectivity script from seperate S3 bucket
 aws s3 cp s3://${ProjectDependenciesBucket}/test-connectivity.py /usr/local/bin/
