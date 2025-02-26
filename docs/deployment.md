@@ -91,9 +91,11 @@ Make sure the files are uploaded with exactly these names to your bucket's root.
 
 The repository includes parameter files in both JSON and YAML formats under `cloudformation/params/`.
 
-***Note***: Use parameters.json with the `--parameters file=` option or parameters.yaml with the `--parameters-file` option. If using AWS Management console to deploy, parameters can instead be edited in the deployment UI 
+>***Note***: Use parameters.json with the `--parameters file=` option or parameters.yaml with the `--parameters-file` option. If using AWS Management console to deploy, parameters can instead be edited in the deployment UI
 
-***Security tip***: For production deployments, sensitive values like DBPassword would be stored using AWS Secrets Manager or parameter overrides instead of in a parameter file.
+>***Note***: The main parameters you will need to change are `ProjectDependenciesBucket` and `DBPassword`. Other parameters or defaulted to work with basic configuration
+
+>***Security tip***: For production deployments, sensitive values like DBPassword would be stored using AWS Secrets Manager or parameter overrides instead of in a parameter file.
 
 <details>
 <summary>Option A: Using parameters.json</summary>
