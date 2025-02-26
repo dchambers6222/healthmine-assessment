@@ -5,7 +5,7 @@ This document provides step-by-step instructions for deploying the Healthmine Do
 <br>
 
 ## Prerequisites
----
+
 
 Before deployment, ensure you have:
 
@@ -18,7 +18,7 @@ Before deployment, ensure you have:
 <br>
 
 ## Preparation Steps
----
+
 
 ### 1. Create and Prepare S3 Dependencies Bucket
 
@@ -164,7 +164,7 @@ You can find these parameter files in the repository under `cloudformation/param
 <br>
 
 ## Deployment Methods
----
+
 
 ### Method 1: AWS Management Console
 
@@ -251,7 +251,7 @@ Remember to replace `YOUR-DEPENDENCIES-BUCKET-NAME` with your actual bucket name
 <br>
 
 ## Stack Deployment Monitoring
----
+
 
 ### Console Monitoring
 
@@ -280,7 +280,7 @@ aws cloudformation describe-stack-events \
 
 ## Accessing Deployment Outputs
 
----
+
 
 After successful deployment, retrieve the outputs to access your resources:
 
@@ -308,7 +308,7 @@ Key outputs include:
 
 ## Testing the Deployment
 
----
+
 
 ### 1. Basic Connectivity Testing
 
@@ -342,7 +342,7 @@ This script will test:
 <br>
 
 ## Troubleshooting
----
+
 
 ### Common Issues and Solutions
 
@@ -392,7 +392,7 @@ aws logs get-log-events \
 <br>
 
 ## Updating the Stack
----
+
 
 To update the stack with new parameters or template changes:
 
@@ -434,7 +434,7 @@ aws cloudformation update-stack \
 <br>
 
 ## Cleaning Up Resources
----
+
 
 When you're finished with the infrastructure, you can delete all resources:
 
