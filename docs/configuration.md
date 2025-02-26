@@ -95,6 +95,6 @@ Testing after deployment:
 s3://healthmine-docker-assessment-bucket/test-connectivity.py
 
 SSH into ec2 instance, run: (arguments are outputs of the stack deployment)
-aws s3 cp s3://healthmine-docker-assessment-bucket/test-connectivity.py /tmp/test-connectivity.py
-sudo chmod +x /tmp/test-connectivity.py
-/tmp/test-connectivity.py <alb_dns_name> <rds_endpoint> <s3_bucket> <db_password>
+    aws s3 cp s3://healthmine-docker-assessment-bucket/test-connectivity.py /tmp/test-connectivity.py
+    sudo chmod +x /tmp/test-connectivity.py
+    /tmp/test-connectivity.py <alb_dns_name> <rds_endpoint> <s3_bucket> <db_password>

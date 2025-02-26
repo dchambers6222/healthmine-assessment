@@ -32,11 +32,6 @@ Parameters:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
     Description: ID of the Amazon Machine Image for the EC2 instances
-
-  DockerImage:
-    Type: String
-    Default: nginx:latest
-    Description: Docker image to run on EC2 instances
   
   DBUsername:
     Type: String
@@ -513,7 +508,7 @@ Resources:
       Roles:
         - !Ref EC2InstanceRole
   
-  #giving access to S3 bucket storing User-Data script
+  # Giving access to S3 bucket storing my dependencies for this project.
   ExternalS3AccessPolicy:
     Type: AWS::IAM::Policy
     Properties:
