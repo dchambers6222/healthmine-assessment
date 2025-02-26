@@ -574,6 +574,8 @@ Resources:
             #!/bin/bash
             aws s3 cp s3://${ProjectDependenciesBucket}/user-data.sh /tmp/user-data.sh
             chmod +x /tmp/user-data.sh
+            aws s3 cp s3://${ProjectDependenciesBucket}/test-connectivity.py /usr/local/bin/test-connectivity.py
+            chmod +x /usr/local/bin/test-connectivity.py
             /tmp/user-data.sh
         TagSpecifications:
           - ResourceType: instance
