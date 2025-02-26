@@ -1,9 +1,6 @@
 
 
 resources:
-    Drupal docker page
-        https://hub.docker.com/_/drupal
-    Drupal's Docker image docs: https://www.drupal.org/docs/develop/development-tools/docker
     Docker Installation on Amazon Linux 2:
     AWS Documentation: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/create-container-image.html
     Docker's official docs: https://docs.docker.com/engine/install/
@@ -11,13 +8,6 @@ resources:
     Docker Compose Installation:
     Official documentation: https://docs.docker.com/compose/install/
 
-    Drupal S3 Configuration:
-    S3 File System module: https://www.drupal.org/project/s3fs
-    AWS S3 module: https://www.drupal.org/project/s3
-
-    Drupal Database Configuration:
-    Database configuration guide: https://www.drupal.org/docs/installing-drupal/step-3-create-a-database
-    RDS connection guide: https://aws.amazon.com/blogs/database/deploying-drupal-on-amazon-rds/
 
 
 I chose yeasy/simple-web docker image because it already integrates the source and destination communication check by returning IP info automatically.
@@ -26,7 +16,7 @@ I chose yeasy/simple-web docker image because it already integrates the source a
 ec2-user chosen because it's the default Linux AMI user
 
 Single cloud formation stack chosen instead of nested stacks because of relative simplicity of project, and ease of maintenance with single stack. 
-
+Imbedded parameters in template file chosen because it eases the deployment process, and for testing of this project, storage of the parameters used at deployment time is not necessary. In a prod environementm it'd be prefereable to use AWS parameter store, or an equivelent, because of the sensitive information passed into the template. 
 
 Chose default AWS VPC config for simplicity and time saving just for demonstartion. In a prod environment, custom VPC with private subnets, and network segregation would be preffered.  
 
@@ -47,7 +37,19 @@ after testing the networking between resources, it was time to add complexity to
 Found Yeasy/simple-web docker container. configured the docker image to use this. updated template to use the healthport 8080 to match the image.
 
 
+test-connectivity script choices:
+    'requests' library for http tesing for ALB and health probe endpoints. Simplicity, great documentation, and ease of error handling.
+    'mysql.connector' library allows testing of connectivity to RDS, and writing of read/write operations, using only DB creds.
+    'boto3' library for s3 testing. put_object method makes it very easy to create and upload/overwrite temp documents for testing.
+        Have to filter warnings for python deprecation because default AWS version is 3.7
 
+
+
+CloudWatch intergration:
+    Create Log Group called "app-logs", set retention to 30 days for testing cost reduction
+    EC2 instance IAM group has access for:
+        cloudwatch:PutMetricData, cloudwatch:GetMetricStatistics, cloudwatch:ListMetrics
+        logs:CreateLogStream, logs:CreateLogGroup, logs:PutLogEvents, logs:DescribeLogStreams
 
 
 
@@ -92,9 +94,9 @@ Testing log:
 
 
 Testing after deployment:
-s3://healthmine-docker-assessment-bucket/test-connectivity.py
+s3://<ProjectDependenciesBucket>/test-connectivity.py
 
 SSH into ec2 instance, run: (arguments are outputs of the stack deployment)
-    aws s3 cp s3://healthmine-docker-assessment-bucket/test-connectivity.py /tmp/test-connectivity.py
+    aws s3 cp s3://<ProjectDependenciesBucket>/test-connectivity.py /tmp/test-connectivity.py
     sudo chmod +x /tmp/test-connectivity.py
     /tmp/test-connectivity.py <alb_dns_name> <rds_endpoint> <s3_bucket> <db_password>

@@ -1,4 +1,4 @@
-# Healthmine Docker Web Application - Architecture Document
+# Healthmine Docker Web App - Architecture Document
 
 ## 1. Network Infrastructure
 
@@ -68,7 +68,7 @@
 
 **Application S3 Bucket**
 - Versioning enabled, AES-256 encryption
-- **Lifecycle Policy**: STANDARD_IA after 90 days, expire after 365 days
+- **Lifecycle Policy**: STANDARD_IA after 90 days, expire after 365
 - **Access Control**: Public access blocked, restricted via bucket policy
 
 **Dependencies S3 Bucket** (External)
@@ -108,10 +108,10 @@
 | EnvironmentType | assessment | Deployment environment |
 | HTTPHealthPort | 8080 | Health check port |
 | CertificateARN | - | Optional SSL cert ARN |
-| AMIID | Amazon Linux 2 | AMI ID (via SSM) |
+| AMIID | Amazon Linux 2 | AMI ID |
 | DBUsername | admin | RDS username |
-| DBPassword | - | RDS password (min 8 chars) |
-| InstanceType | t3.micro | EC2 instance size |
+| DBPassword | - | RDS password |
+| InstanceType | t3.micro | EC2 size |
 | ProjectDependenciesBucket | - | S3 bucket with scripts |
 
 ## 10. Stack Outputs
@@ -137,7 +137,7 @@
 - Encrypted storage, no public database access
 - Optional HTTPS support
 
-**Operational Excellence**
+**Operational**
 - Health checks, centralized logging
 - Automated instance provisioning
 - Infrastructure testing script
@@ -147,25 +147,24 @@
 - S3 lifecycle policies
 - Log retention limits
 
-## 12. Recommended Improvements
+## 12. Improvement Considerations If Applied to Prod Workflow
 
-**Security Enhancements**
-- Move RDS to private subnets with NAT Gateway
+**Security**
+- Move RDS to private subnets
 - Restrict SSH access to specific IP ranges
 - Use Secrets Manager for credentials
 - Implement VPC endpoints for AWS services
 
-**Performance Improvements**
-- Add CloudFront for content delivery
+**Performance**
 - Implement target tracking scaling policies
-- Add RDS read replicas for read-heavy workloads
+- Add RDS read replicas
 
-**Monitoring Enhancements**
-- Configure CloudWatch Alarms
+**Monitoring**
+- CloudWatch Alarms
 - Implement more sophisticated health checks
 - Add X-Ray for distributed tracing
 
-**Deployment Improvements**
+**Deployment**
 - Implement CI/CD pipeline
 - Add CloudFormation validation
-- Support blue/green deployments
+- Blue/green deployment capabilities

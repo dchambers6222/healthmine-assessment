@@ -58,7 +58,7 @@ Parameters:
 
   ProjectDependenciesBucket:
     Type: String
-    Default: healthmine-docker-assessment-bucket
+    Default: REPLACE_WITH_YOUR_BUCKET_NAME
     Description: S3 Bucket where user-data.sh and any other depencies are stored
 
 
