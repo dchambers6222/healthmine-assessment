@@ -75,6 +75,7 @@ git clone https://github.com/dchambers6222/healthmine-assessment.git
 7. Verify that both files appear in the root of your bucket
 </details>
 
+<br>
 
 ##### **Important**: The CloudFormation template uses these specific file paths: 
 - `s3://<your-bucket>/user-data.sh`
@@ -86,49 +87,16 @@ Make sure the files are uploaded with exactly these names to your bucket's root.
 
 ### 2. Parameter Preparation
 
-Prepare the parameters required for deployment. The repository includes parameter files for both JSON and YAML formats:
+The repository includes parameter files in both JSON and YAML formats under `cloudformation/params/`.
+
+***Note***: Use parameters.json with the `--parameters file=` option or parameters.yaml with the `--parameters-file` option. If using AWS Management console to deploy, parameters can instead be edited in the deployment UI 
+
+***Security tip***: For production deployments, sensitive values like DBPassword would be stored using AWS Secrets Manager or parameter overrides instead of in a parameter file.
 
 <details>
 <summary>Option A: Using parameters.json</summary>
 
-```json
-[
-  {
-    "ParameterKey": "ProjectNamePrefix",
-    "ParameterValue": "healthmine"
-  },
-  {
-    "ParameterKey": "EnvironmentType",
-    "ParameterValue": "assessment"
-  },
-  {
-    "ParameterKey": "HTTPHealthPort",
-    "ParameterValue": "8080"
-  },
-  {
-    "ParameterKey": "CertificateARN",
-    "ParameterValue": ""
-  },
-  {
-    "ParameterKey": "DBUsername",
-    "ParameterValue": "admin"
-  },
-  {
-    "ParameterKey": "DBPassword",
-    "ParameterValue": "YourSecurePassword"
-  },
-  {
-    "ParameterKey": "InstanceType",
-    "ParameterValue": "t3.micro"
-  },
-  {
-    "ParameterKey": "ProjectDependenciesBucket",
-    "ParameterValue": "YOUR-DEPENDENCIES-BUCKET-NAME"
-  }
-]
-```
-
-Update the JSON file with your specific values, especially:
+Edit the `cloudformation/params/parameters.json` file with your specific values, especially:
 - `DBPassword`: Your secure database password
 - `ProjectDependenciesBucket`: The S3 bucket name you created in the previous step
 </details>
@@ -136,32 +104,11 @@ Update the JSON file with your specific values, especially:
 <details>
 <summary>Option B: Using parameters.yaml</summary>
 
-```yaml
-Parameters:
-  - ParameterKey: ProjectNamePrefix
-    ParameterValue: healthmine
-  - ParameterKey: EnvironmentType
-    ParameterValue: assessment
-  - ParameterKey: HTTPHealthPort
-    ParameterValue: 8080
-  - ParameterKey: CertificateARN
-    ParameterValue: ""
-  - ParameterKey: DBUsername
-    ParameterValue: admin
-  - ParameterKey: DBPassword
-    ParameterValue: YourSecurePassword
-  - ParameterKey: InstanceType
-    ParameterValue: t3.micro
-  - ParameterKey: ProjectDependenciesBucket
-    ParameterValue: YOUR-DEPENDENCIES-BUCKET-NAME
-```
-
-Update the YAML file with your specific values, especially:
+Edit the `cloudformation/params/parameters.yaml` file with your specific values, especially:
 - `DBPassword`: Your secure database password
 - `ProjectDependenciesBucket`: The S3 bucket name you created in the previous step
 </details>
 
-You can find these parameter files in the repository under `cloudformation/params/`.
 
 <br>
 
@@ -305,6 +252,9 @@ Key outputs include:
 - `RDSEndpoint` - Database connection endpoint
 - `S3BucketName` - Application S3 bucket name
 - `CloudWatchLogGroup` - Log group for application logs
+
+***Note***: You will need these for the testing script.
+
 
 <br>
 
