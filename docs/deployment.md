@@ -2,19 +2,23 @@
 
 This document provides step-by-step instructions for deploying the Healthmine Docker Web Application infrastructure using AWS CloudFormation.
 
+<br>
+
 ## Prerequisites
+---
 
 Before deployment, ensure you have:
 
 1. **AWS CLI**: Installed and configured with appropriate permissions
 2. **S3 Dependencies Bucket**: You must create your own S3 bucket to host the required scripts
-   - The template default (`healthmine-docker-assessment-bucket`) is just a placeholder
-   - S3 bucket names are globally unique, so you'll need to create your own with a unique name
    - This bucket must be in the same region as your deployment
 3. **Database Password**: A secure password for the RDS instance (min 8 characters)
 4. **SSL Certificate** (Optional): ARN of an ACM certificate for HTTPS
 
+<br>
+
 ## Preparation Steps
+---
 
 ### 1. Create and Prepare S3 Dependencies Bucket
 
@@ -22,24 +26,57 @@ First, create your own S3 bucket to host the required scripts:
 
 ```bash
 # Create a unique bucket name - replace with your own unique identifier
-BUCKET_NAME="healthmine-assessment-$(openssl rand -hex 4)"
+BUCKET_NAME="healthmine-assessment-dependencies-$(openssl rand -hex 4)"
 
 # Create the bucket in your preferred region
 aws s3 mb s3://${BUCKET_NAME} --region us-east-1
 
-# Make note of this bucket name as you'll need it for the CloudFormation parameters
+# Make note of this bucket name. You'll need it for the CloudFormation parameters
 echo "Your dependencies bucket name is: ${BUCKET_NAME}"
 ```
 
 Then upload the required scripts from the repository to your dependencies bucket root:
+#### Option A: Using AWS CLI to copy files from the repository 
+<details>
+<summary>Click to expand/collapse</summary>
 
 ```bash
-# Copy both scripts to your S3 bucket
+# Clone the repository
+git clone https://github.com/dchambers6222/healthmine-assessment.git
+
+# Navigate to the repository directory
+cd healthmine-assessment
+
+# Copy the scripts to your S3 bucket
 aws s3 cp scripts/user-data.sh s3://${BUCKET_NAME}/
 aws s3 cp scripts/test-connectivity.py s3://${BUCKET_NAME}/
+
+# Clean up (optional)
+cd .. && rm -rf healthmine-assessment
+```
+</details>
+
+#### Option B: Using the AWS S3 Console UI 
+<details>
+<summary>Click to expand/collapse</summary>
+
+1. Clone or download the repository from GitHub:
+```bash
+git clone https://github.com/dchambers6222/healthmine-assessment.git
 ```
 
-**Important**: The CloudFormation template uses these specific file paths:
+2. Navigate to the AWS S3 Console: https://s3.console.aws.amazon.com/
+3. Find and click on your bucket name
+4. Click the "Upload" button
+5. Click "Add files" or drag and drop the following files:
+- healthmine-assessment/scripts/user-data.sh
+- healthmine-assessment/scripts/test-connectivity.py
+6. Click "Upload"
+7. Verify that both files appear in the root of your bucket
+</details>
+
+
+##### **Important**: The CloudFormation template uses these specific file paths: 
 - `s3://<your-bucket>/user-data.sh`
 - `s3://<your-bucket>/test-connectivity.py`
 
@@ -47,9 +84,11 @@ Make sure the files are uploaded with exactly these names to your bucket's root.
 
 ### 2. Parameter Preparation
 
-Prepare the parameters required for deployment. You can either provide these directly during stack creation or create a parameters file:
+Prepare the parameters required for deployment. The repository includes parameter files for both JSON and YAML formats:
 
-**parameters.json**:
+<details>
+<summary>Option A: Using parameters.json</summary>
+
 ```json
 [
   {
@@ -87,7 +126,45 @@ Prepare the parameters required for deployment. You can either provide these dir
 ]
 ```
 
+Update the JSON file with your specific values, especially:
+- `DBPassword`: Your secure database password
+- `ProjectDependenciesBucket`: The S3 bucket name you created in the previous step
+</details>
+
+<details>
+<summary>Option B: Using parameters.yaml</summary>
+
+```yaml
+Parameters:
+  - ParameterKey: ProjectNamePrefix
+    ParameterValue: healthmine
+  - ParameterKey: EnvironmentType
+    ParameterValue: assessment
+  - ParameterKey: HTTPHealthPort
+    ParameterValue: 8080
+  - ParameterKey: CertificateARN
+    ParameterValue: ""
+  - ParameterKey: DBUsername
+    ParameterValue: admin
+  - ParameterKey: DBPassword
+    ParameterValue: YourSecurePassword
+  - ParameterKey: InstanceType
+    ParameterValue: t3.micro
+  - ParameterKey: ProjectDependenciesBucket
+    ParameterValue: YOUR-DEPENDENCIES-BUCKET-NAME
+```
+
+Update the YAML file with your specific values, especially:
+- `DBPassword`: Your secure database password
+- `ProjectDependenciesBucket`: The S3 bucket name you created in the previous step
+</details>
+
+You can find these parameter files in the repository under `cloudformation/params/`.
+
+<br>
+
 ## Deployment Methods
+---
 
 ### Method 1: AWS Management Console
 
@@ -97,7 +174,9 @@ Prepare the parameters required for deployment. You can either provide these dir
 4. Select "Upload a template file" and upload `cloudformation/main.yaml`
 5. Click "Next"
 6. Enter stack name (e.g., "healthmine-webapp")
-7. Enter parameter values as required
+7. Enter parameter values as required, making sure to:
+   - Set your S3 dependencies bucket name
+   - Use a secure database password
 8. Click "Next"
 9. Configure stack options (tags, permissions, etc.) if needed
 10. Click "Next"
@@ -105,17 +184,50 @@ Prepare the parameters required for deployment. You can either provide these dir
 
 ### Method 2: AWS CLI
 
-Deploy using the AWS CLI with parameters file:
+<details>
+<summary>Option A: Deploy using JSON parameters file</summary>
 
 ```bash
+# Clone the repository if you haven't already
+git clone https://github.com/dchambers6222/healthmine-assessment.git
+cd healthmine-assessment
+
+# Update the parameters file with your values
+# Be sure to replace YOUR-DEPENDENCIES-BUCKET-NAME with your actual bucket name
+# and set a secure password
+
+# Deploy the stack
 aws cloudformation create-stack \
   --stack-name healthmine-webapp \
   --template-body file://cloudformation/main.yaml \
-  --parameters file://parameters.json \
+  --parameters file://cloudformation/params/parameters.json \
   --capabilities CAPABILITY_IAM
 ```
+</details>
 
-Or with inline parameters:
+<details>
+<summary>Option B: Deploy using YAML parameters file</summary>
+
+```bash
+# Clone the repository if you haven't already
+git clone https://github.com/dchambers6222/healthmine-assessment.git
+cd healthmine-assessment
+
+# Update the parameters file with your values
+# Be sure to replace YOUR-DEPENDENCIES-BUCKET-NAME with your actual bucket name
+# and set a secure password
+
+# Deploy the stack
+aws cloudformation create-stack \
+  --stack-name healthmine-webapp \
+  --template-body file://cloudformation/main.yaml \
+  --parameters-file cloudformation/params/parameters.yaml \
+  --capabilities CAPABILITY_IAM
+```
+</details>
+
+<details>
+<summary>Option C: Deploy with inline parameters</summary>
 
 ```bash
 aws cloudformation create-stack \
@@ -133,7 +245,13 @@ aws cloudformation create-stack \
   --capabilities CAPABILITY_IAM
 ```
 
+Remember to replace `YOUR-DEPENDENCIES-BUCKET-NAME` with your actual bucket name and set a secure password.
+</details>
+
+<br>
+
 ## Stack Deployment Monitoring
+---
 
 ### Console Monitoring
 
@@ -158,7 +276,11 @@ aws cloudformation describe-stack-events \
   --query "StackEvents[].{Timestamp:Timestamp,Resource:LogicalResourceId,Status:ResourceStatus,Reason:ResourceStatusReason}"
 ```
 
+<br>
+
 ## Accessing Deployment Outputs
+
+---
 
 After successful deployment, retrieve the outputs to access your resources:
 
@@ -182,7 +304,11 @@ Key outputs include:
 - `S3BucketName` - Application S3 bucket name
 - `CloudWatchLogGroup` - Log group for application logs
 
+<br>
+
 ## Testing the Deployment
+
+---
 
 ### 1. Basic Connectivity Testing
 
@@ -213,7 +339,10 @@ This script will test:
 - RDS database connection and operations
 - S3 bucket upload and deletion operations
 
+<br>
+
 ## Troubleshooting
+---
 
 ### Common Issues and Solutions
 
@@ -260,7 +389,10 @@ aws logs get-log-events \
   --log-stream-name <log-stream-name>
 ```
 
+<br>
+
 ## Updating the Stack
+---
 
 To update the stack with new parameters or template changes:
 
@@ -275,15 +407,34 @@ To update the stack with new parameters or template changes:
 
 ### CLI Method
 
+<details>
+<summary>Option A: Update using JSON parameters file</summary>
+
 ```bash
 aws cloudformation update-stack \
   --stack-name healthmine-webapp \
   --template-body file://cloudformation/main.yaml \
-  --parameters file://parameters.json \
+  --parameters file://cloudformation/params/parameters.json \
   --capabilities CAPABILITY_IAM
 ```
+</details>
+
+<details>
+<summary>Option B: Update using YAML parameters file</summary>
+
+```bash
+aws cloudformation update-stack \
+  --stack-name healthmine-webapp \
+  --template-body file://cloudformation/main.yaml \
+  --parameters-file cloudformation/params/parameters.yaml \
+  --capabilities CAPABILITY_IAM
+```
+</details>
+
+<br>
 
 ## Cleaning Up Resources
+---
 
 When you're finished with the infrastructure, you can delete all resources:
 
@@ -300,4 +451,4 @@ When you're finished with the infrastructure, you can delete all resources:
 aws cloudformation delete-stack --stack-name healthmine-webapp
 ```
 
-**Note:** This will delete all resources created by the stack, including the RDS instance and S3 bucket. The RDS instance will create a final snapshot before deletion as configured in the template.
+**Note:** Because this will delete all resources created by the stack, including the RDS instance and S3 bucket, the RDS instance will create a final snapshot before deletion (as configured in the template). This will have to be removed after as well.
