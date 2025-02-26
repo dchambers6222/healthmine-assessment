@@ -35,6 +35,8 @@ aws s3 mb s3://${BUCKET_NAME} --region us-east-1
 echo "Your dependencies bucket name is: ${BUCKET_NAME}"
 ```
 
+<br>
+
 Then upload the required scripts from the repository to your dependencies bucket root:
 #### Option A: Using AWS CLI to copy files from the repository 
 <details>
