@@ -1,5 +1,4 @@
 # AWS CloudFormation
-*.json
 !package.json
 .aws-sam/
 
