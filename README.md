@@ -63,7 +63,7 @@ Key assumptions in this implementation:
 1. **Network Configuration**: Uses public subnets for demonstration; private subnets recommended for production
 2. **Security**: Open SSH access for testing purposes; would be restricted in production
 3. **Docker Image**: Uses public demo image; would be replaced by application-specific image
-4. **Full details**: See the [Configuration Guide](docs/configuration-details.md) for comprehensive design decisions
+4. **Full details**: See the [Configuration Details](docs/configuration-details.md) for comprehensive design decisions
 
 ## Assessment Requirements
 
