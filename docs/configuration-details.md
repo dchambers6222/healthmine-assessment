@@ -10,7 +10,17 @@
 
 - **VPC Configuration**: I'm using the default AWS VPC CIDR (10.0.0.0/16) with two public subnets across availability zones for this demonstration. In production, I'd implement a custom VPC with private subnets and network segregation for better security isolation.
 
-- **Auto Scaling Group**: I implemented simple scaling policies for the demonstration. The minimum size of 1 and maximum of 3 instances provides basic high availability while controlling costs. In production, I'd use target tracking policies for more granular scaling based on actual metrics.
+- **Auto Scaling Group**: I implemented target tracking scaling policies based on 50% CPU utilization. This approach provides more granular, demand-based scaling compared to simple scaling policies, automatically adjusting capacity based on actual resource usage. The minimum size of 2 and maximum of 6 instances provides enhanced high availability while still controlling costs. I set the desired capacity to 2 instances to ensure baseline redundancy across availability zones.
+
+- **CloudWatch Dashboard**: I created a CloudWatch dashboard specifically for monitoring the Auto Scaling Group metrics, including CPU utilization and instance counts. This provides centralized visibility into the scaling behavior and performance of the infrastructure.
+
+- **Auto Scaling Group Metrics**: I configured detailed 1-minute metrics collection for the Auto Scaling Group including:
+  - GroupInServiceInstances
+  - GroupDesiredCapacity
+  - GroupPendingInstances
+  - GroupTerminatingInstances
+  - GroupTotalInstances
+  These metrics provide comprehensive visibility into scaling operations and instance lifecycle events.
 
 - **Load Balancer Configuration**: I set up an Application Load Balancer with HTTP/HTTPS listeners to provide scalability and availability. I specifically chose port 8080 for the health probe to separate application traffic from health check traffic, a common practice in microservice architectures.
 
@@ -38,13 +48,13 @@
 
 - **S3 Lifecycle Policy**: I configured S3 objects to transition to Standard-IA after 90 days and deletion after 365 days for cost optimization. This approach balances accessibility with cost-efficiency for the demonstration.
 
-- **S3 Bucket Permissions**: I granted full access (get, put, delete, and list) to the EC2 IAM Role for flexibility in the demonstration environment. In production, more restrictive permissions following the principle of least privilege would be appropriate.
+- **S3 Bucket Configuration**: I implemented a standardized naming convention (`${ProjectNamePrefix}-${EnvironmentType}-app-files-${AWS::AccountId}-${AWS::Region}`) that ensures global uniqueness while maintaining clear identification of purpose and environment. I granted full access (get, put, delete, and list) to the EC2 IAM Role for flexibility in the demonstration environment. In production, more restrictive permissions following the principle of least privilege would be appropriate.
 
 - **Versioning and Encryption**: I enabled S3 bucket versioning and AES-256 encryption for data protection, demonstrating security best practices.
 
 ### Security Configuration
 
-- **Load Balancer Choice**: I selected Application Load Balancer rather than Network Load Balancer due to its support for HTTP/HTTPS health checks, SSL termination capabilities, and potential for multiple target groups. This provides a more feature-rich entry point for the application while maintaining high availability.
+- **Load Balancer Choice**: I selected Application Load Balancer rather than Network Load Balancer due to its support for HTTP/HTTPS health checks, SSL termination capabilities, and potential for multiple target groups. This provides a more feature-rich entry point for the application while maintaining high availability. I implemented a conditional HTTPS listener that's only created when a Certificate ARN is provided as a parameter. This approach allows for secure communication when needed while maintaining deployment flexibility without requiring SSL in development environments.
 
 - **Security Groups**: I configured these in a layered approach:
   - ALB security group accepts traffic from the internet on ports 80, 443, and 8080
@@ -60,6 +70,10 @@
 - **CloudWatch Integration**: I configured a log group with 30-day retention to balance operational visibility with cost efficiency. I granted the EC2 instance IAM role specific CloudWatch permissions:
   - `cloudwatch:PutMetricData`, `cloudwatch:GetMetricStatistics`, `cloudwatch:ListMetrics`
   - `logs:CreateLogStream`, `logs:CreateLogGroup`, `logs:PutLogEvents`, `logs:DescribeLogStreams`
+
+- **CloudWatch Dashboard**: I implemented a dedicated dashboard for the Auto Scaling Group to provide centralized visibility into scaling operations. Initially, I encountered an issue where instance count metrics showed "no data available" despite CPU utilization metrics working properly. This was resolved by adding explicit metrics collection allowances in the Auto Scaling Group properties.
+
+- **Auto Scaling Metrics**: I configured the Auto Scaling Group to use target tracking based on 50% CPU utilization. This provides a more elegant and automated approach to scaling than simple policies, as it continuously adjusts capacity based on real-time demand rather than fixed thresholds.
 
 - **Test Connectivity Script**: I developed a comprehensive Python script to verify all infrastructure components:
   - Used the `requests` library for HTTP testing due to its simplicity and excellent documentation
@@ -82,7 +96,11 @@
 
 ### Auto Scaling Policy Configuration
 
-- I identified that the ScaleUpPolicy contained an additional parameter (`EstimatedInstanceWarmup`) not supported by SimpleScaling policy type. I removed this parameter to ensure compatibility.
+- I initially configured simple scaling policies but later replaced them with a target tracking policy based on 50% CPU utilization. This provided more granular and responsive scaling behavior without requiring multiple threshold configurations.
+
+### CloudWatch Dashboard Metrics Issue
+
+- When implementing the CloudWatch dashboard, I observed that while CPU utilization metrics were displaying correctly, instance count metrics showed "no data available." After investigation, I resolved this by adding explicit metrics collection allowances in the Auto Scaling Group properties, ensuring comprehensive monitoring of all scaling activities.
 
 ### Load Balancer Health Checks
 
@@ -110,7 +128,12 @@ My testing after deployment follows a systematic approach:
    - Verified database connections and operations
    - Tested creating tables and inserting records
 
-4. **Automation Script**:
+4. **Auto Scaling Test**:
+   - Verified the target tracking policy was properly configured
+   - Monitored scaling events through the CloudWatch dashboard
+   - Confirmed instances scaled based on CPU utilization thresholds
+
+5. **Automation Script**:
    I created the `test-connectivity.py` script to automate validation of all components:
    ***Note***: this script is copied into the system PATH during setup, and set to executable
    ```bash
@@ -124,28 +147,38 @@ For adaptation to a production environment, I would recommend several enhancemen
 
 1. **Web Application Firewall (WAF)**: Though listed as optional in the assessment, a WAF would be essential in production to protect against common web exploits and attacks. I omitted this from the current implementation to prioritize demonstrating high availability and data retention features within the time constraints.
 
-2. **Security Enhancements**:
+2. **Enhanced Monitoring**:
+   - Expand CloudWatch dashboards to include additional metrics
+   - Set up automated alerting based on defined thresholds
+   - Implement more granular metric collection for application-specific metrics
+
+3. **Auto Scaling Refinements**:
+   - Fine-tune target tracking parameters based on observed application behavior
+   - Implement scheduled scaling for predictable workload patterns
+   - Consider multi-metric scaling policies for more complex workloads
+
+4. **Security Enhancements**:
    - Move RDS to private subnets
    - Restrict SSH access to specific IP ranges
    - Use AWS Secrets Manager for database credentials
    - Implement more granular IAM policies
 
-3. **Networking**:
+5. **Networking**:
    - Implement a proper network architecture with private subnets
    - Use VPC endpoints for AWS services to avoid public internet traffic
    - Implement network ACLs as an additional security layer
 
-4. **Monitoring Enhancements**:
+6. **Monitoring Enhancements**:
    - Add CloudWatch alarms for resource utilization
    - Implement enhanced health checks
    - Consider AWS X-Ray for distributed tracing
 
-5. **Database Optimizations**:
+7. **Database Optimizations**:
    - Use parameter groups optimized for workload type
    - Consider read replicas for read-heavy workloads
    - Implement automated backup strategies
 
-6. **Deployment Pipeline**:
+8. **Deployment Pipeline**:
    - Implement CI/CD for infrastructure changes
    - Add automated testing before deployment
    - Implement blue/green deployment capabilities

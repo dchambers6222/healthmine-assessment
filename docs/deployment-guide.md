@@ -14,6 +14,7 @@ Before deployment, ensure you have:
    - This bucket must be in the same region as your deployment
 3. **Database Password**: A secure password for the RDS instance (min 8 characters)
 4. **SSL Certificate** (Optional): ARN of an ACM certificate for HTTPS
+   - Note: The HTTPS listener will only be created if a certificate ARN is provided
 
 <br>
 
@@ -254,8 +255,9 @@ aws cloudformation describe-stacks \
 Key outputs include:
 - `LoadBalancerDNSName` - URL to access the web application
 - `RDSEndpoint` - Database connection endpoint
-- `S3BucketName` - Application S3 bucket name
+- `S3BucketName` - Application S3 bucket name (follows pattern `${ProjectNamePrefix}-${EnvironmentType}-app-files-${AWS::AccountId}-${AWS::Region}`)
 - `CloudWatchLogGroup` - Log group for application logs
+- `EC2ScalingDashboard` - Dashboard for monitoring Auto Scaling Group metrics
 
 ***Note***: You will need these for the testing script.
 
@@ -293,6 +295,15 @@ This script will test:
 - RDS database connection and operations
 - S3 bucket upload and deletion operations
 
+### 3. Auto Scaling Validation
+
+The deployment includes an Auto Scaling Group with:
+- Minimum: 2 instances
+- Maximum: 6 instances
+- Desired: 2 instances
+
+The Auto Scaling Group uses a target tracking scaling policy based on 50% CPU utilization. You can monitor scaling activities through the CloudWatch dashboard created by the stack.
+
 <br>
 
 ## Troubleshooting
@@ -322,6 +333,11 @@ This script will test:
    - Verify target group health in the EC2 console
    - Check ALB security group allows traffic on ports 80 and 8080
    - Verify EC2 security group allows traffic from the ALB
+
+5. **Auto Scaling Issues**
+   - Check the EC2 monitoring dashboard (see outputs for link)
+   - Verify that the target tracking policy is correctly configured
+   - Review CloudWatch metrics for the Auto Scaling Group
 
 ### Viewing Logs
 

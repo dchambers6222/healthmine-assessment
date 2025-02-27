@@ -30,6 +30,8 @@
 ### 4. Application Setup (Day 4)
 - [✅] Write EC2 user data script
 - [✅] Configure Docker setup
+- [✅] Implement load balancer and auto-scaling
+- [✅] Configure health checks
 - [✅] Test application deployment
 - [✅] Verify database connections
 
@@ -39,9 +41,13 @@
 - [✅] Add troubleshooting guide
 - [✅] Clean up and optimize code
 
-### 6. Enhancements (Day 7)
-- [o] Add monitoring (if time permits)
-- [o] Implement any optional features
+### 6. Monitoring & Enhancements (Day 7)
+- [✅] Set up CloudWatch logs
+- [✅] Create EC2 monitoring dashboard
+- [✅] Configure ASG metrics collection
+- [✅] Implement connectivity testing script
+- [✅] Add optional HTTPS support
+- [o] Implement any additional optional features
 
 ## Resources
 - AWS Documentation

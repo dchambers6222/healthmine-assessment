@@ -39,8 +39,9 @@
 
 **Auto Scaling Group**
 - Spans both public subnets
-- Min: 1, Max: 3, Desired: 1 instance
-- **Scaling Policies**: Simple +1/-1 with 300s cooldown
+- Min: 2, Max: 6, Desired: 2 instances
+- **Scaling Policies**: Target tracking based on 50% CPU utilization with 300s warmup
+- **Metrics Collection**: Detailed 1-minute metrics for instance counts and states
 
 ## 4. Load Balancing
 
@@ -50,7 +51,7 @@
 - **Listeners**:
   - HTTP (80) → Target Group
   - Health (8080) → Target Group
-  - HTTPS (443) → Target Group (conditional on certificate ARN)
+  - HTTPS (443) → Target Group (created only when CertificateARN parameter is provided)
 
 ## 5. Database Layer
 
@@ -67,6 +68,7 @@
 ## 6. Storage Resources
 
 **Application S3 Bucket**
+- Named using pattern: `${ProjectNamePrefix}-${EnvironmentType}-app-files-${AWS::AccountId}-${AWS::Region}`
 - Versioning enabled, AES-256 encryption
 - **Lifecycle Policy**: STANDARD_IA after 90 days, expire after 365
 - **Access Control**: Public access blocked, restricted via bucket policy
@@ -80,6 +82,12 @@
 **CloudWatch Logs**
 - Log group path: `/${ProjectNamePrefix}/${EnvironmentType}/app-logs`
 - 30-day retention period
+
+**CloudWatch Dashboard**
+- Custom dashboard for EC2 instance monitoring: `${ProjectNamePrefix}-${EnvironmentType}-ec2-scaling-dashboard`
+- Displays:
+  - ASG CPU Utilization
+  - ASG Instance Count
 
 **Connectivity Testing Script**
 - Tests all infrastructure components:
@@ -107,7 +115,7 @@
 | ProjectNamePrefix | healthmine | Resource naming prefix |
 | EnvironmentType | assessment | Deployment environment |
 | HTTPHealthPort | 8080 | Health check port |
-| CertificateARN | - | Optional SSL cert ARN |
+| CertificateARN | - | Optional SSL cert ARN (HTTPS listener relies on this) |
 | AMIID | Amazon Linux 2 | AMI ID |
 | DBUsername | admin | RDS username |
 | DBPassword | - | RDS password |

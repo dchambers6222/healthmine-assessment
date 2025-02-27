@@ -94,7 +94,8 @@ Resources:
           Value: !Ref ProjectNamePrefix
 
 
-#Network Configuration
+
+# Network Configuration
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties: 
@@ -173,6 +174,7 @@ Resources:
     Properties: 
       SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
+
 
 
 # Security Groups
@@ -257,6 +259,7 @@ Resources:
           Value: !Ref ProjectNamePrefix
 
 
+
 # S3 Bucket for App Files
   S3Bucket:
     Type: AWS::S3::Bucket
@@ -309,6 +312,7 @@ Resources:
               - !Sub arn:aws:s3:::${S3Bucket}
 
   
+
 # Application Load Balancer
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -388,6 +392,7 @@ Resources:
       SslPolicy: ELBSecurityPolicy-2016-08
 
 
+
 # DB Configuration
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -465,6 +470,48 @@ Resources:
         - Key: Project
           Value: !Ref ProjectNamePrefix
 
+  EC2InstanceMonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub ${ProjectNamePrefix}-${EnvironmentType}-ec2-scaling-dashboard
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/EC2", "CPUUtilization", "AutoScalingGroupName", "${ProjectNamePrefix}-${EnvironmentType}-asg" ]
+                ],
+                "period": 60,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "ASG CPU Utilization"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/AutoScaling", "GroupInServiceInstances", "AutoScalingGroupName", "${ProjectNamePrefix}-${EnvironmentType}-asg" ]
+                ],
+                "period": 60,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "ASG Instance Count"
+              }
+            }
+          ]
+        }
+
 
 
 # IAM Roles
@@ -508,7 +555,7 @@ Resources:
       Roles:
         - !Ref EC2InstanceRole
   
-  # Giving access to S3 bucket storing my dependencies for this project.
+    #Giving access to S3 bucket storing my dependencies for this project.
   ExternalS3AccessPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -551,6 +598,7 @@ Resources:
         - !Ref EC2InstanceRole
 
 
+
 # EC2 Instance Configuration
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -588,6 +636,7 @@ Resources:
                 Value: !Ref ProjectNamePrefix
 
 
+
 # Auto Scaling Group
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -600,11 +649,19 @@ Resources:
       LaunchTemplate:
         LaunchTemplateId: !Ref LaunchTemplate
         Version: !GetAtt LaunchTemplate.LatestVersionNumber
-      MaxSize: '3'
-      MinSize: '1'
-      DesiredCapacity: '1'
+      MaxSize: '6'
+      MinSize: '2'
+      DesiredCapacity: '2'
       TargetGroupARNs:
         - !Ref ALBTargetGroup
+      MetricsCollection:
+        - Granularity: "1Minute"
+          Metrics:
+            - "GroupInServiceInstances"
+            - "GroupDesiredCapacity"
+            - "GroupPendingInstances"
+            - "GroupTerminatingInstances"
+            - "GroupTotalInstances"
       Tags:
         - Key: Name
           Value: !Sub ${ProjectNamePrefix}-${EnvironmentType}-instance
@@ -616,24 +673,17 @@ Resources:
           Value: !Ref ProjectNamePrefix
           PropagateAtLaunch: true
 
-  ScaleUpPolicy:
+  CPUTargetTrackingPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
       AutoScalingGroupName: !Ref AutoScalingGroup
-      PolicyType: SimpleScaling
-      AdjustmentType: ChangeInCapacity
-      ScalingAdjustment: 1
-      Cooldown: '300'
-
-  ScaleDownPolicy:
-    Type: AWS::AutoScaling::ScalingPolicy
-    Properties:
-      AutoScalingGroupName: !Ref AutoScalingGroup
-      PolicyType: SimpleScaling
-      AdjustmentType: ChangeInCapacity
-      ScalingAdjustment: -1
-      Cooldown: '300'
-
+      PolicyName: !Sub ${ProjectNamePrefix}-${EnvironmentType}-cpu-policy
+      PolicyType: TargetTrackingScaling
+      EstimatedInstanceWarmup: 300
+      TargetTrackingConfiguration:
+        TargetValue: 50
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
 
 
 
@@ -659,3 +709,7 @@ Outputs:
   CloudWatchLogGroup:
     Value: !Ref AppLogGroup
     Description: CloudWatch log group for application logs
+
+  EC2ScalingDashboard:
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${ProjectNamePrefix}-${EnvironmentType}-ec2-scaling-dashboard"
+    Description: CloudWatch dashboard for EC2 instance monitoring
