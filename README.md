@@ -48,10 +48,13 @@ This project implements a CloudFormation template and supporting resources to pr
 
 ## Technical Highlights
 
-- **High Availability Design**: Multi-AZ deployment with Auto Scaling for resilience
+- **High Availability Design**: Multi-AZ deployment with Auto Scaling (Min: 2, Max: 6 instances) using CPU-based target tracking scaling for resilience
 - **Security First Approach**: Least privilege IAM roles and layered security groups
 - **Infrastructure Testing**: Custom script for validating all infrastructure components
 - **Comprehensive Documentation**: Detailed guides for architecture, deployment, and configuration
+- **Monitoring Solution**: Custom CloudWatch dashboard for tracking Auto Scaling Group metrics and performance
+- **Standardized Resource Naming**: Consistent naming patterns for all resources including S3 buckets with account ID and region for global uniqueness
+- **Flexible Security Configuration**: Optional HTTPS support with conditional listener creation based on certificate availability
 
 ## Assumptions and Limitations
 
