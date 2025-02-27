@@ -68,18 +68,21 @@ If time allows, consider adding:
 
 ## Repository Structure
 ```
-├── README.md                 # Main documentation
-├── docs/                     # Detailed documentation
-│   ├── architecture.md         # Architecture details
-│   ├── deployment.md           # Deployment instructions
-│   └── configuration.md        # Configuration guide
-├── cloudformation/           # CloudFormation template
-│   ├── main.yaml               # Main stack
-│   └── params/                 # Parameter files
-├── scripts/                  # Any helper scripts
-│   └── user-data.sh            # EC2 user data script
-├── docker/                   # Docker configurations
-│   └── docker-compose.yml      # May not need 
-└── tests/                    # Any testing scripts
-    └── test_functionality.sh   # Testing data flow
+├── README.md                  # Main documentation
+├── docs/                      # Detailed documentation
+│   ├── architecture.md        # Architecture details
+│   ├── architecture.png       # Architecture diagram
+│   ├── deployment.md          # Deployment instructions
+│   └── configuration.md       # Configuration guide
+├── cloudformation/            # CloudFormation template
+│   ├── main.yaml              # Main stack
+│   └── params/                # Parameter files
+│       ├── parameters.yaml    # Parameter values
+│       └── parameters.json    # Parameter values (JSON format)
+├── scripts/                   # Helper scripts
+│   ├── user-data.sh           # EC2 user data script
+│   └── test-connectivity.py   # Infrastructure testing script
+├── .gitignore                 # Git ignore file
+├── ASSESSMENT_OBJECTIVE.md    # Project requirements
+└── PROJECT_PLAN.md            # Implementation plan and tasks
 ```

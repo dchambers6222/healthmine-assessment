@@ -1,0 +1,34 @@
+[
+    {
+        "ParameterKey": "ProjectNamePrefix",
+        "ParameterValue": "healthmine"
+    },
+    {
+        "ParameterKey": "EnvironmentType",
+        "ParameterValue": "assessment"
+    },
+    {
+        "ParameterKey": "HTTPHealthPort",
+        "ParameterValue": "8080"
+    },
+    {
+        "ParameterKey": "CertificateARN",
+        "ParameterValue": ""
+    },
+    {
+        "ParameterKey": "DBUsername",
+        "ParameterValue": "admin"
+    },
+    {
+        "ParameterKey": "DBPassword",
+        "ParameterValue": "YourSecurePassword"
+    },
+    {
+        "ParameterKey": "InstanceType",
+        "ParameterValue": "t3.micro"
+    },
+    {
+        "ParameterKey": "ProjectDependenciesBucket",
+        "ParameterValue": "YOUR-DEPENDENCIES-BUCKET-NAME"
+    }
+]
