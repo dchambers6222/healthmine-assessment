@@ -93,7 +93,7 @@ The repository includes parameter files in both JSON and YAML formats under `clo
 
 >***Note***: Use parameters.json with the `--parameters file=` option or parameters.yaml with the `--parameters-file` option. If using AWS Management console to deploy, parameters can instead be edited in the deployment UI
 
->***Note***: The main parameters you will need to change are `ProjectDependenciesBucket` and `DBPassword`. Other parameters or defaulted to work with basic configuration
+>***Note***: The main parameters you will need to change are `ProjectDependenciesBucket` and `DBPassword`. Other parameters are defaulted to work with basic configuration
 
 >***Security tip***: For production deployments, sensitive values like DBPassword would be stored using AWS Secrets Manager or parameter overrides instead of in a parameter file.
 
@@ -283,10 +283,8 @@ http://<LoadBalancerDNSName>:8080
 SSH into any EC2 instance in the Auto Scaling Group, then run the connectivity test:
 
 ```bash
-# Use your own dependencies bucket name here
-aws s3 cp s3://YOUR-DEPENDENCIES-BUCKET-NAME/test-connectivity.py /tmp/test-connectivity.py
-sudo chmod +x /tmp/test-connectivity.py
-/tmp/test-connectivity.py <LoadBalancerDNSName> <RDSEndpoint> <S3BucketName> <DBPassword>
+# the test-connectivity script is automatically copied to system PATH, and is set Executable
+test-connectivity.py <LoadBalancerDNSName> <RDSEndpoint> <S3BucketName> <DBPassword>
 ```
 
 This script will test:
@@ -313,7 +311,7 @@ This script will test:
 3. **Health Checks Failing**
    - SSH into an EC2 instance and verify Docker containers are running:
      ```bash
-     docker ps
+     sudo docker ps
      ```
    - Check if the health endpoint is responding locally:
      ```bash
@@ -329,8 +327,8 @@ This script will test:
 
 Check Docker logs:
 ```bash
-docker logs simple-web
-docker logs health-check
+sudo docker logs simple-web
+sudo docker logs health-check
 ```
 
 Check user-data script execution logs:
